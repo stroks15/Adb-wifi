@@ -24,6 +24,15 @@ class AiOptimizationAdvisorTest {
     }
 
     @Test
+    fun identifiesFireTvAndLowMemoryClass() {
+        val advice = AiOptimizationAdvisor.analyze(
+            "MANUFACTURER: Amazon\\nMODEL: AFTMM\\nSDK: 30\\nMemTotal: 900000 kB"
+        )
+        assertTrue(advice.any { it.contains("Fire TV/Fire OS") })
+        assertTrue(advice.any { it.contains("RAM instalada aproximada") && it.contains("recursos limitados") })
+    }
+
+    @Test
     fun doesNotAssumeMissingPingMeansWifiIsDisconnected() {
         val advice = AiOptimizationAdvisor.analyze("MemAvailable: 800000 kB")
         assertTrue(advice.any { it.contains("no demuestra") })

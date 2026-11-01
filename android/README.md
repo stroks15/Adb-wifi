@@ -5,7 +5,7 @@ La APK es una aplicación Android nativa. No requiere Termux, un servidor Node, 
 ## Funciones incluidas
 
 - Conexión ADB directa mediante IP/host y puerto configurables.
-- Vinculación de Depuración inalámbrica Android 11+ mediante puerto temporal y código de seis dígitos.
+- Vinculación de Depuración inalámbrica mediante puerto temporal y código de seis dígitos (Android 11+ en teléfonos; Android TV requiere Android 13+).
 - Botón para reintentar después de aceptar la autorización RSA en el dispositivo destino.
 - Identidad ADB persistente (certificado y clave privada) guardada en preferencias privadas de la app; las copias de seguridad están desactivadas.
 - Diagnóstico de fabricante, modelo, versión Android/SDK, memoria, almacenamiento, uptime, resolución y densidad.
@@ -17,7 +17,7 @@ La APK es una aplicación Android nativa. No requiere Termux, un servidor Node, 
 
 1. Activa Depuración ADB o Depuración inalámbrica en el dispositivo destino.
 2. Introduce su IP y puerto de conexión.
-3. En Android 11+, usa primero el puerto de vinculación y el código de seis dígitos que aparecen en la pantalla de vinculación.
+3. En teléfonos Android 11+ o Android TV 13+, usa primero el puerto de vinculación y el código de seis dígitos que aparecen en la pantalla de vinculación.
 4. Después usa el puerto de conexión que aparece en la pantalla principal de Depuración inalámbrica. No son el mismo puerto.
 5. Si Android muestra una confirmación RSA, acéptala en el destino y pulsa CONTINUAR en la APK.
 
@@ -32,12 +32,12 @@ Ambos equipos deben poder comunicarse en la misma red. La APK no puede aceptar p
 
 ## Compilación
 
-GitHub Actions ejecuta clean testDebugUnitTest assembleDebug con JDK 17, Gradle 9.3.1, Android Gradle Plugin 9.1.1 y Android SDK Platform 36 y Kotlin 2.4.21 y Kadb Android 1.3.0. El artefacto Liamliz-TV-Hack-debug contiene una APK debug firmada automáticamente para pruebas e instalación manual.
+GitHub Actions ejecuta clean testDebugUnitTest assembleDebug con JDK 17, Gradle 9.3.1, Android Gradle Plugin 9.1.1 y Android SDK Platform 36, Kotlin 2.4.21 y Kadb Android 1.3.0. La app tiene minSdk 23 y targetSdk 35. El artefacto Liamliz-TV-Hack-debug contiene una APK debug firmada automáticamente para pruebas e instalación manual.
 
 
 ## Dependencias y licencia
 
-Kadb Android se publica bajo Apache-2.0. Su implementación de pairing incluye la dependencia transitiva com.github.Flyfish233:spake2-java:1.1.1, publicada en JitPack y marcada GPL-3.0. Antes de distribuir esta APK como producto cerrado o integrarla en un proyecto con licencia incompatible, revisa las obligaciones de esa dependencia o sustituye la implementación de pairing por una alternativa con licencia compatible. El repositorio de este proyecto no recibe una licencia nueva automáticamente.
+Kadb Android se publica bajo Apache-2.0. Su implementación de pairing incluye la dependencia transitiva com.github.Flyfish233:spake2-java:1.0.5, publicada en JitPack y marcada GPL-3.0. Antes de distribuir esta APK como producto cerrado o integrarla en un proyecto con licencia incompatible, revisa las obligaciones de esa dependencia o sustituye la implementación de pairing por una alternativa con licencia compatible. El repositorio de este proyecto no recibe una licencia nueva automáticamente.
 
 
-La compilación usa Kadb Android 1.3.0 porque las versiones 2.1.x publicadas actualmente declaran compileSdk mínimo 37, cuyo paquete de plataforma aún no está disponible en el repositorio SDK del runner de CI. Se mantienen compileSdk 36 y se fija BouncyCastle 1.86; HiddenApiBypass permanece en la versión transitiva 6.1 que incluye Kadb 1.3.0, porque 6.2 declara compileSdk 37.
+La compilación usa Kadb Android 1.3.0 porque las versiones 2.1.x declaran compileSdk mínimo 37 y el paquete Android 37 no estuvo disponible en el repositorio SDK del runner de CI durante esta compilación. Se mantienen compileSdk 36 y se fija BouncyCastle 1.86; HiddenApiBypass permanece en la versión transitiva 6.1 que incluye Kadb 1.3.0, porque 6.2 declara compileSdk 37.

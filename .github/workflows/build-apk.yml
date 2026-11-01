@@ -19,6 +19,9 @@ on:
       - "android/build.gradle"
       - "android/settings.gradle"
       - "android/gradle.properties"
+      - "server.js"
+      - "public/**"
+      - "package.json"
       - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 

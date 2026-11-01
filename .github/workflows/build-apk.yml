@@ -25,10 +25,18 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Gradle 8.13
+      - name: Set up Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.13"
+          gradle-version: "9.3.1"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 17 SDK
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platforms;android-37" "build-tools;37.0.0"
 
       - name: Verify Android build configuration
         working-directory: android
@@ -36,6 +44,7 @@ jobs:
           test -f gradle.properties
           grep -q '^android.useAndroidX=true$' gradle.properties
           grep -q "com.flyfishxu:kadb-android:2.1.5" app/build.gradle
+          grep -q "compileSdk 37" app/build.gradle
 
       - name: Build and test APK
         working-directory: android

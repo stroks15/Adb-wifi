@@ -538,6 +538,10 @@ class MainActivity : Activity() {
                         val response = current.shell("settings get global " + key)
                         if (response.exitCode != 0) throw IllegalStateException("No se pudo leer " + key + ": " + response.allOutput)
                         val value = response.allOutput.trim()
+                        if (value.isNotEmpty() && value != "null" &&
+                            !value.matches(Regex("(?:[0-9]+(?:\\\\.[0-9]*)?|\\\\.[0-9]+)"))) {
+                            throw IllegalStateException("Valor previo no válido para " + key + "; no se aplicaron cambios.")
+                        }
                         previous[key] = if (value.isBlank() || value == "null") null else value
                     }
                     try {
@@ -592,9 +596,13 @@ class MainActivity : Activity() {
                     animationKeys.forEach { key ->
                         val hasValue = prefs.getBoolean("profile_has_" + key, false)
                         val value = prefs.getString("profile_value_" + key, "") ?: ""
-                        val command = if (hasValue) "settings put global " + key + " " + value else "settings delete global " + key
-                        val response = current.shell(command)
-                        if (response.exitCode != 0) failures += key + ": " + response.allOutput
+                        if (hasValue && !value.matches(Regex("(?:[0-9]+(?:\\\\.[0-9]*)?|\\\\.[0-9]+)"))) {
+                            failures += key + ": valor guardado inválido; no se ejecutó el comando"
+                        } else {
+                            val command = if (hasValue) "settings put global " + key + " " + value else "settings delete global " + key
+                            val response = current.shell(command)
+                            if (response.exitCode != 0) failures += key + ": " + response.allOutput
+                        }
                     }
                     if (failures.isNotEmpty()) throw IllegalStateException("Restauración parcial. Reintenta: " + failures.joinToString("; "))
                     prefs.edit().putBoolean("profile_saved", false).apply()

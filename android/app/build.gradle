@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace 'com.liamliz.tvhack'
-    compileSdk 37
+    compileSdk 36
 
     defaultConfig {
         applicationId 'com.liamliz.tvhack'
@@ -26,6 +26,6 @@ android {
 }
 
 dependencies {
-    implementation 'com.flyfishxu:kadb-android:2.1.5'
+    implementation 'com.flyfishxu:kadb-android:2.1.4'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
 }

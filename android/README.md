@@ -32,7 +32,7 @@ Ambos equipos deben poder comunicarse en la misma red. La APK no puede aceptar p
 
 ## Compilación
 
-GitHub Actions ejecuta clean testDebugUnitTest assembleDebug con JDK 17, Gradle 9.3.1, Android Gradle Plugin 9.1.1 y Android SDK Platform 37 y Kotlin 2.4.21. El artefacto Liamliz-TV-Hack-debug contiene una APK debug firmada automáticamente para pruebas e instalación manual.
+GitHub Actions ejecuta clean testDebugUnitTest assembleDebug con JDK 17, Gradle 9.3.1, Android Gradle Plugin 9.1.1 y Android SDK Platform 36 y Kotlin 2.4.21 y Kadb Android 2.1.4. El artefacto Liamliz-TV-Hack-debug contiene una APK debug firmada automáticamente para pruebas e instalación manual.
 
 
 ## Dependencias y licencia

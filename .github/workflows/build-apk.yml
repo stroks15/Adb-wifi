@@ -35,15 +35,15 @@ jobs:
           SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses
-          "$SDKMANAGER" --sdk_root="$SDK_ROOT" --channel=3 "platforms;android-37" "build-tools;37.0.0"
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" --channel=3 --channel=0 "platforms;android-36" "build-tools;36.0.0"
 
       - name: Verify Android build configuration
         working-directory: android
         run: |
           test -f gradle.properties
           grep -q '^android.useAndroidX=true$' gradle.properties
-          grep -q "com.flyfishxu:kadb-android:2.1.5" app/build.gradle
-          grep -q "compileSdk 37" app/build.gradle
+          grep -q "com.flyfishxu:kadb-android:2.1.4" app/build.gradle
+          grep -q "compileSdk 36" app/build.gradle
 
       - name: Build and test APK
         working-directory: android

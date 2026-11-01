@@ -41,6 +41,8 @@ class MainActivity : Activity() {
     private val discoveryListeners = mutableListOf<NsdManager.DiscoveryListener>()
     private val discovered = linkedMapOf<String, Pair<String, Int>>()
     private lateinit var discoveredView: TextView
+    private lateinit var discoveredList: LinearLayout
+    private var selectedEndpoint: Pair<String, Int>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -90,7 +92,9 @@ class MainActivity : Activity() {
         root.addView(action("⌁ ANALIZAR WI-FI · BUSCAR DISPOSITIVOS ADB", ::scanWifi))
         discoveredView = heading("Escáner: sin búsqueda activa", 13f)
         root.addView(discoveredView)
-        root.addView(action("CONECTAR DISPOSITIVO DETECTADO", ::connectDiscovered))
+        discoveredList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        root.addView(discoveredList)
+        root.addView(action("CONECTAR EQUIPO SELECCIONADO", ::connectDiscovered))
 
         root.addView(heading("VINCULACIÓN INALÁMBRICA · ANDROID 11+"))
         root.addView(heading("Abre Depuración inalámbrica en el destino. Usa el puerto temporal y el código de esa pantalla."))
@@ -128,7 +132,9 @@ class MainActivity : Activity() {
         val manager = getSystemService(Context.NSD_SERVICE) as NsdManager
         nsdManager = manager
         discovered.clear()
-        discoveredView.text = "🔎 Buscando servicios ADB en la red local…\nServicios: _adb._tcp · _adb-tls-connect._tcp · _adb-tls-pairing._tcp"
+        selectedEndpoint = null
+        discoveredList.removeAllViews()
+        discoveredView.text = "🔎 Buscando servicios ADB…"
         runCatching {
             val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             multicastLock = wifi.createMulticastLock("liamliz-adb-discovery").apply { setReferenceCounted(false); acquire() }
@@ -146,9 +152,7 @@ class MainActivity : Activity() {
                                 val address = info.host?.hostAddress ?: return
                                 val port = info.port
                                 synchronized(discovered) { discovered[info.serviceName] = address to port }
-                                runOnUiThread {
-                                    discoveredView.text = "🟢 DISPOSITIVOS ADB DETECTADOS\n" + synchronized(discovered) { discovered.entries.joinToString("\n") { "• ${it.key}  ${it.value.first}:${it.value.second}" } }
-                                }
+                                runOnUiThread { renderDiscovered() }
                             }
                         })
                     }
@@ -166,11 +170,35 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun renderDiscovered() {
+        discoveredList.removeAllViews()
+        val entries = synchronized(discovered) { discovered.entries.map { Triple(it.key, it.value.first, it.value.second) } }
+        discoveredView.text = if (entries.isEmpty()) "Buscando dispositivos…" else entries.size.toString() + " equipos encontrados. Toca el correcto para seleccionarlo."
+        entries.forEach { item ->
+            val endpoint = item.second to item.third
+            val selected = selectedEndpoint == endpoint
+            val option = Button(this).apply {
+                text = (if (selected) "✓ SELECCIONADO  " else "○ SELECCIONAR  ") + item.first + "\n" + item.second + ":" + item.third
+                isAllCaps = false
+                setOnClickListener {
+                    selectedEndpoint = endpoint
+                    host.setText(item.second)
+                    connectPort.setText(item.third.toString())
+                    renderDiscovered()
+                    status.text = "Equipo seleccionado: " + item.second + ":" + item.third
+                    output.text = "Confirma que sea tu equipo y pulsa CONECTAR EQUIPO SELECCIONADO."
+                }
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 5 }
+            }
+            discoveredList.addView(option)
+        }
+    }
+
     private fun connectDiscovered() {
-        val endpoint = synchronized(discovered) { discovered.values.firstOrNull() }
+        val endpoint = selectedEndpoint
         if (endpoint == null) {
-            status.text = "🔎 NO HAY DISPOSITIVOS ADB DETECTADOS"
-            output.text = "Mantén activada Depuración inalámbrica en la TV y asegúrate de que ambos equipos estén en la misma Wi-Fi. La búsqueda mDNS depende de que el router permita multicast; si está aislado, introduce IP y puerto manualmente."
+            status.text = "Selecciona primero un equipo"
+            output.text = "La app no elegirá el primer resultado automáticamente. Toca el dispositivo correcto en la lista."
             return
         }
         host.setText(endpoint.first)

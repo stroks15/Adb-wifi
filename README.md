@@ -1,13 +1,17 @@
 # Liamliz TV Hack
 
-Aplicación Android nativa para administrar dispositivos Android/Android TV por ADB Wi-Fi. La IP y los puertos se introducen dentro de la APK; no se fija ningún dispositivo.
+Proyecto con panel web local y APK Android nativa para diagnóstico y control ADB Wi-Fi.
 
-## Conexión
+## APK Android independiente
 
-- **ADB TCP clásico:** introduce IP y puerto ADB (5555 solo si el equipo está configurado para ese modo).
-- **Depuración inalámbrica moderna:** introduce el puerto temporal de vinculación y el código de seis dígitos que muestra el dispositivo; pulsa **Vincular dispositivo**. Después introduce el puerto ADB de conexión (es distinto del puerto de vinculación) y pulsa **Continuar**.
-- Si aparece una solicitud de autorización ADB/RSA, acéptala en el dispositivo y vuelve a la app para pulsar **CONTINUAR**.
+La app Android está en android/ y no depende del panel web, Node.js ni Termux. Incluye conexión ADB por IP/puerto, pairing de Wireless Debugging, autorización/reintento, identidad ADB persistente, diagnóstico, listado de paquetes, D-pad y un perfil reversible de animaciones. Consulta android/README.md.
 
-La app integra Kadb (Apache-2.0), cliente ADB Kotlin sin Termux ni binario adb externo. No se presupone conectividad ni un equipo específico.
+## Compilación
 
-Esta versión inicial solo realiza consultas de diagnóstico y lista paquetes. No desinstala aplicaciones ni modifica ajustes automáticamente. GitHub Actions compila un APK debug y lo publica como artefacto del workflow.
+GitHub Actions genera una APK debug firmada en cada cambio de android/** o del workflow. Descarga el artefacto Liamliz-TV-Hack-debug desde la ejecución exitosa en Actions.
+
+La compilación usa JDK 17, Gradle 8.13, Android Gradle Plugin 8.13.2, Kotlin 2.4.21 y Kadb Android 2.1.5. AndroidX está habilitado explícitamente.
+
+## Panel web
+
+El panel web sigue siendo una interfaz local separada que requiere Node.js y ADB instalado en el equipo que ejecuta el servidor. La APK nativa no necesita ni utiliza ese servidor.

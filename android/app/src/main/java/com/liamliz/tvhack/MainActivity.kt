@@ -160,6 +160,10 @@ class MainActivity : Activity() {
     }
 
     private fun scanWifi() {
+        discoveryListeners.forEach { listener -> runCatching { nsdManager?.stopServiceDiscovery(listener) } }
+        discoveryListeners.clear()
+        runCatching { multicastLock?.let { if (it.isHeld) it.release() } }
+        multicastLock = null
         val manager = getSystemService(Context.NSD_SERVICE) as NsdManager
         nsdManager = manager
         discovered.clear()
@@ -565,7 +569,13 @@ class MainActivity : Activity() {
                         if (value != null) edit.putString("profile_value_" + key, value)
                         else edit.remove("profile_value_" + key)
                     }
-                    edit.apply()
+                    if (!edit.commit()) {
+                        previous.forEach { (key, value) ->
+                            val restore = if (value == null) "settings delete global " + key else "settings put global " + key + " " + value
+                            runCatching { current.shell(restore) }
+                        }
+                        throw IllegalStateException("No se pudo guardar el respaldo; se intentó restaurar el estado original.")
+                    }
                     "Perfil aplicado: animaciones a 0.5x.\nValores anteriores guardados para restauración."
                 }
             }

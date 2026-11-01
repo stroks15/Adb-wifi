@@ -524,6 +524,11 @@ class MainActivity : Activity() {
             status.text = "Puerto ADB no válido"
             return
         }
+        if (prefs.getBoolean("profile_saved", false)) {
+            status.text = "Hay un perfil pendiente de restaurar"
+            output.text = "Restaura primero el perfil anterior. Así se conserva el estado original y no se guarda 0.5x como nuevo valor previo."
+            return
+        }
         status.text = "Guardando ajustes actuales y aplicando perfil…"
         scope.launch {
             val result = withContext(Dispatchers.IO) {

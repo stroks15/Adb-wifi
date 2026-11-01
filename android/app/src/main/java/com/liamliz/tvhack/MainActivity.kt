@@ -122,6 +122,8 @@ class MainActivity : Activity() {
         val diagnosticPanel = panel("DIAGNÓSTICO DEL EQUIPO", "Consultas de solo lectura para comprobar modelo, Android, memoria, almacenamiento y pantalla.")
         diagnosticPanel.addView(action("EJECUTAR DIAGNÓSTICO COMPLETO", true, ::diagnostics))
         diagnosticPanel.addView(action("VER APLICACIONES INSTALADAS", false, ::installedApps))
+        diagnosticPanel.addView(action("ANÁLISIS INTELIGENTE DE RENDIMIENTO + WI-FI", true, ::smartAnalysis))
+        diagnosticPanel.addView(action("MEDIR CONEXIÓN WI-FI", false, ::wifiDiagnostics))
         pageDiagnostics.addView(diagnosticPanel)
 
         pageTools = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -426,6 +428,67 @@ class MainActivity : Activity() {
             }
             result.onSuccess { status.text = "Diagnóstico completado"; output.text = it }
                 .onFailure { status.text = "Error de diagnóstico: " + (it.message ?: "error") }
+        }
+    }
+
+
+    // Read-only performance and network snapshot. Recommendations are generated locally.
+    private fun smartAnalysis() {
+        val current = connectedClient() ?: return
+        status.text = "Analizando rendimiento, launcher, red y respuesta…"
+        val checks = listOf(
+            "MODELO" to "getprop ro.product.manufacturer; getprop ro.product.model; getprop ro.build.version.release; getprop ro.build.version.sdk",
+            "CPU" to "dumpsys cpuinfo", "MEMORIA" to "cat /proc/meminfo",
+            "ALMACENAMIENTO" to "df -h /data", "TEMPERATURA" to "dumpsys thermalservice",
+            "WIFI" to "dumpsys wifi", "RED" to "ip route; ip addr",
+            "LATENCIA INTERNET" to "ping -c 4 -W 2 1.1.1.1",
+            "LAUNCHER ACTUAL" to "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+            "ANIMACIONES" to "settings get global window_animation_scale; settings get global transition_animation_scale; settings get global animator_duration_scale",
+            "REFRESCO" to "settings get system peak_refresh_rate; settings get system min_refresh_rate",
+            "RESOLUCION" to "wm size; wm density"
+        )
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    buildString {
+                        checks.forEach { (name, command) ->
+                            val response = current.shell(command)
+                            append("=== ").append(name).append(" ===\\n")
+                                .append(response.allOutput.ifBlank { "(sin salida)" }).append("\\n\\n")
+                        }
+                    }
+                }
+            }
+            result.onSuccess { report ->
+                val advice = AiOptimizationAdvisor.analyze(report)
+                status.text = "ANÁLISIS COMPLETADO · recomendaciones priorizadas"
+                output.text = report + "\\n=== ASESOR INTELIGENTE LOCAL ===\\n" +
+                    advice.joinToString("\\n") { "• " + it } +
+                    "\\n\\nEste asesor es local y no modifica ajustes. La conexión con un modelo generativo externo requiere configurar un proveedor y una clave API propia."
+            }.onFailure { status.text = "Falló el análisis: " + (it.message ?: "error") }
+        }
+    }
+
+    private fun wifiDiagnostics() {
+        val current = connectedClient() ?: return
+        status.text = "Midiendo conectividad Wi-Fi…"
+        val commands = listOf(
+            "Estado Wi-Fi" to "dumpsys wifi", "Ruta y puerta de enlace" to "ip route",
+            "Direcciones de red" to "ip addr", "Latencia Internet" to "ping -c 5 -W 2 1.1.1.1"
+        )
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    buildString {
+                        commands.forEach { (label, command) ->
+                            append("=== ").append(label).append(" ===\\n")
+                            append(current.shell(command).allOutput.ifBlank { "(sin salida)" }).append("\\n\\n")
+                        }
+                    }
+                }
+            }
+            result.onSuccess { status.text = "Diagnóstico Wi-Fi completado"; output.text = it }
+                .onFailure { status.text = "Error de red: " + (it.message ?: "error") }
         }
     }
 

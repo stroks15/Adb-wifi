@@ -57,7 +57,7 @@ async function deviceCommand(target, command, timeoutMs) {
 }
 
 function parseMeminfo(output) {
-  const match = output.match(/MemAvailable:\s+(\d+)\s+kB/i) || output.match(/MemFree:\s+(\d+)\s+kB/i);
+  const match = output.match(/MemAvailable:\s+(\d+)\s+kB/i);
   return match ? Math.round(Number(match[1]) / 1024) : null;
 }
 

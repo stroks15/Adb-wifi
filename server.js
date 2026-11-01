@@ -17,7 +17,7 @@ app.use(express.static(path.join(appRoot, 'public'), { index: 'index.html' }));
 
 function parseTarget(body) {
   const ip = String(body?.ip || '').trim();
-  const port = Number(body?.port || 5555);
+  const port = Number(body?.port ?? 5555);
   const validIp = /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$/.test(ip);
   if (!validIp) throw new Error('Introduce una dirección IPv4 válida.');
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Puerto ADB inválido.');

@@ -133,7 +133,8 @@ class MainActivity : Activity() {
             val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             multicastLock = wifi.createMulticastLock("liamliz-adb-discovery").apply { setReferenceCounted(false); acquire() }
         }
-        val types = listOf("_adb._tcp.", "_adb-tls-connect._tcp.", "_adb-tls-pairing._tcp.")
+        // Pairing endpoints are intentionally excluded: they require a PIN and are not connect ports.
+        val types = listOf("_adb._tcp.", "_adb-tls-connect._tcp.")
         types.forEach { type ->
             val listener = object : NsdManager.DiscoveryListener {
                 override fun onDiscoveryStarted(serviceType: String) {}

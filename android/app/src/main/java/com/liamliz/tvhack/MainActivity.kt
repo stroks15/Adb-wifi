@@ -6,6 +6,10 @@ import android.text.InputType
 import android.util.Base64
 import android.view.Gravity
 import android.view.View
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
+import android.content.Context
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -32,6 +36,11 @@ class MainActivity : Activity() {
     private lateinit var continueButton: Button
     private var client: Kadb? = null
     private var identityReady = false
+    private var nsdManager: NsdManager? = null
+    private var multicastLock: WifiManager.MulticastLock? = null
+    private val discoveryListeners = mutableListOf<NsdManager.DiscoveryListener>()
+    private val discovered = linkedMapOf<String, Pair<String, Int>>()
+    private lateinit var discoveredView: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,12 +48,12 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(22, 22, 22, 28)
-            setBackgroundColor(0xFF0B1220.toInt())
+            setBackgroundColor(0xFF020B06.toInt())
         }
         fun heading(value: String, size: Float = 16f) = TextView(this).apply {
             text = value
             textSize = size
-            setTextColor(0xFFE5EDF7.toInt())
+            setTextColor(0xFF8BFF9B.toInt())
             setPadding(0, 15, 0, 7)
         }
         fun field(hintText: String, value: String, numeric: Boolean = false) = EditText(this).apply {
@@ -56,7 +65,7 @@ class MainActivity : Activity() {
             setHintTextColor(0xFF94A3B8.toInt())
             inputType = if (numeric) InputType.TYPE_CLASS_NUMBER else InputType.TYPE_CLASS_TEXT
             setPadding(14, 10, 14, 10)
-            setBackgroundColor(0xFF1E293B.toInt())
+            setBackgroundColor(0xFF092014.toInt())
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 7 }
         }
         fun action(label: String, callback: () -> Unit) = Button(this).apply {
@@ -64,10 +73,13 @@ class MainActivity : Activity() {
             isAllCaps = false
             textSize = 14f
             setOnClickListener { callback() }
+            backgroundTintList = android.content.res.ColorStateList.valueOf(0xFF35E86B.toInt())
+            setTextColor(0xFF031409.toInt())
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = 5; bottomMargin = 3 }
         }
 
-        root.addView(heading("LIAMLIZ TV HACK", 27f))
+        root.addView(heading("◈ LIAMLIZ TV HACK", 29f))
+        root.addView(heading("ADB CONTROL CENTER  •  GREEN NEON EDITION", 12f))
         root.addView(heading("Control ADB Wi-Fi para Android y Android TV. No necesita Termux, navegador ni app auxiliar."))
         root.addView(heading("Dispositivo destino"))
         host = field("IP o nombre del dispositivo", prefs.getString("host", "") ?: "")
@@ -75,8 +87,12 @@ class MainActivity : Activity() {
         root.addView(host)
         root.addView(connectPort)
         root.addView(action("CONECTAR / REINTENTAR", ::connectDevice))
+        root.addView(action("⌁ ANALIZAR WI-FI · BUSCAR DISPOSITIVOS ADB", ::scanWifi))
+        discoveredView = heading("Escáner: sin búsqueda activa", 13f)
+        root.addView(discoveredView)
+        root.addView(action("CONECTAR DISPOSITIVO DETECTADO", ::connectDiscovered))
 
-        root.addView(heading("Vinculación inalámbrica Android 11+"))
+        root.addView(heading("VINCULACIÓN INALÁMBRICA · ANDROID 11+"))
         root.addView(heading("Abre Depuración inalámbrica en el destino. Usa el puerto temporal y el código de esa pantalla."))
         pairPort = field("Puerto temporal de vinculación", prefs.getString("pair_port", "") ?: "", true)
         pairCode = field("Código de vinculación de 6 dígitos", "")
@@ -91,21 +107,74 @@ class MainActivity : Activity() {
         continueButton = action("CONTINUAR · YA AUTORICÉ ADB", ::connectDevice).apply { visibility = View.GONE }
         root.addView(continueButton)
 
-        root.addView(heading("Diagnóstico del dispositivo"))
+        root.addView(heading("DIAGNÓSTICO DEL DISPOSITIVO"))
         root.addView(action("Ejecutar diagnóstico completo", ::diagnostics))
         root.addView(action("Ver aplicaciones de terceros", ::installedApps))
 
-        root.addView(heading("Perfil seguro y reversible"))
+        root.addView(heading("OPTIMIZACIÓN SEGURA Y REVERSIBLE"))
         root.addView(heading("Cambia solo las tres escalas de animación a 0.5x. Guarda los valores previos para restaurarlos."))
         root.addView(action("Aplicar perfil 0.5x", ::applySafeProfile))
         root.addView(action("Restaurar valores anteriores", ::restoreSafeProfile))
 
-        root.addView(heading("Control remoto"))
+        root.addView(heading("CONTROL REMOTO"))
         addDpad(root, ::sendKey)
         root.addView(action("DESCONECTAR", ::disconnect))
         root.addView(heading("Seguridad: no ejecuta root, no desinstala ni deshabilita aplicaciones y no cambia actualizaciones, DNS o kernel. La única modificación incluida es el perfil reversible de animaciones.", 12f))
         setContentView(ScrollView(this).apply { addView(root) })
         initializeAdbIdentity()
+    }
+
+    private fun scanWifi() {
+        val manager = getSystemService(Context.NSD_SERVICE) as NsdManager
+        nsdManager = manager
+        discovered.clear()
+        discoveredView.text = "🔎 Buscando servicios ADB en la red local…\nServicios: _adb._tcp · _adb-tls-connect._tcp · _adb-tls-pairing._tcp"
+        runCatching {
+            val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            multicastLock = wifi.createMulticastLock("liamliz-adb-discovery").apply { setReferenceCounted(false); acquire() }
+        }
+        val types = listOf("_adb._tcp.", "_adb-tls-connect._tcp.", "_adb-tls-pairing._tcp.")
+        types.forEach { type ->
+            val listener = object : NsdManager.DiscoveryListener {
+                override fun onDiscoveryStarted(serviceType: String) {}
+                override fun onServiceFound(service: NsdServiceInfo) {
+                    if (service.serviceType.contains("adb", true)) {
+                        manager.resolveService(service, object : NsdManager.ResolveListener {
+                            override fun onResolveFailed(info: NsdServiceInfo, errorCode: Int) {}
+                            override fun onServiceResolved(info: NsdServiceInfo) {
+                                val address = info.host?.hostAddress ?: return
+                                val port = info.port
+                                synchronized(discovered) { discovered[info.serviceName] = address to port }
+                                runOnUiThread {
+                                    discoveredView.text = "🟢 DISPOSITIVOS ADB DETECTADOS\n" + synchronized(discovered) { discovered.entries.joinToString("\n") { "• ${it.key}  ${it.value.first}:${it.value.second}" } }
+                                }
+                            }
+                        })
+                    }
+                }
+                override fun onServiceLost(service: NsdServiceInfo) {
+                    synchronized(discovered) { discovered.remove(service.serviceName) }
+                    runOnUiThread { discoveredView.text = if (discovered.isEmpty()) "El servicio ADB dejó de anunciarse." else discovered.entries.joinToString("\n") { "• ${it.key}  ${it.value.first}:${it.value.second}" } }
+                }
+                override fun onDiscoveryStopped(serviceType: String) {}
+                override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) { runCatching { manager.stopServiceDiscovery(this) } }
+                override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) { runCatching { manager.stopServiceDiscovery(this) } }
+            }
+            discoveryListeners += listener
+            runCatching { manager.discoverServices(type, NsdManager.PROTOCOL_DNS_SD, listener) }
+        }
+    }
+
+    private fun connectDiscovered() {
+        val endpoint = synchronized(discovered) { discovered.values.firstOrNull() }
+        if (endpoint == null) {
+            status.text = "🔎 NO HAY DISPOSITIVOS ADB DETECTADOS"
+            output.text = "Mantén activada Depuración inalámbrica en la TV y asegúrate de que ambos equipos estén en la misma Wi-Fi. La búsqueda mDNS depende de que el router permita multicast; si está aislado, introduce IP y puerto manualmente."
+            return
+        }
+        host.setText(endpoint.first)
+        connectPort.setText(endpoint.second.toString())
+        connectDevice()
     }
 
     private fun initializeAdbIdentity() {
@@ -194,7 +263,7 @@ class MainActivity : Activity() {
         val target = endpoint(connectPort.text.toString()) ?: return
         saveConnection()
         continueButton.visibility = View.GONE
-        status.text = "Conectando a " + target.first + ":" + target.second + "…"
+        status.text = "🟡 CONECTANDO · " + target.first + ":" + target.second
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
@@ -212,12 +281,14 @@ class MainActivity : Activity() {
             result.onSuccess { connected ->
                 client?.close()
                 client = connected.first
-                status.text = "CONECTADO · " + connected.second
+                status.text = "🟢 CONECTADO Y VERIFICADO · " + connected.second
                 output.text = "Sesión ADB verificada con " + target.first + ":" + target.second
                 continueButton.visibility = View.GONE
             }.onFailure { error ->
-                status.text = "Conexión pendiente: " + (error.message ?: "sin respuesta")
-                output.text = "Si aparece «¿Permitir depuración ADB?», acepta la huella RSA en el dispositivo destino y vuelve aquí. En Android 11+, primero pulsa VINCULAR DISPOSITIVO con su puerto temporal y código; después conecta con el puerto principal. Pulsa CONTINUAR para reintentar."
+                val detail = error.message ?: "sin respuesta"
+                val unauthorized = detail.contains("unauthorized", true) || detail.contains("auth", true)
+                status.text = if (unauthorized) "🟠 AUTORIZACIÓN ADB PENDIENTE" else "🔴 CONEXIÓN FALLIDA"
+                output.text = if (unauthorized) "El destino aún no autorizó esta identidad ADB. Acepta el diálogo en la TV y vuelve a pulsar CONTINUAR. Si no aparece, revisa que la depuración esté activada y que el puerto sea el de conexión, no el de pairing. Detalle: $detail" else "No se estableció una sesión ADB válida. Comprueba que el teléfono y la TV estén en la misma red, que el puerto sea correcto y que el destino tenga ADB activo. Para Android 11+ vincula primero con el puerto temporal y luego usa el puerto de conexión. Detalle: $detail"
                 continueButton.visibility = View.VISIBLE
             }
         }
@@ -415,6 +486,10 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        discoveryListeners.forEach { listener -> runCatching { nsdManager?.stopServiceDiscovery(listener) } }
+        discoveryListeners.clear()
+        runCatching { multicastLock?.let { if (it.isHeld) it.release() } }
+        multicastLock = null
         client?.close()
         client = null
         scope.cancel()

@@ -13,9 +13,9 @@ object AiOptimizationAdvisor {
         if (memAvailableKb != null) {
             val mb = memAvailableKb / 1024
             when {
-                mb < 180 -> advice += "Memoria crítica (\${mb} MB disponibles): revisa apps en segundo plano y evita launchers pesados."
-                mb < 400 -> advice += "Memoria ajustada (\${mb} MB): prueba un launcher ligero y limita apps de inicio una por una."
-                else -> advice += "Memoria disponible: \${mb} MB. No se justifica limpiar RAM agresivamente; Android administra la memoria."
+                mb < 180 -> advice += "Memoria crítica (${mb} MB disponibles): revisa apps en segundo plano y evita launchers pesados."
+                mb < 400 -> advice += "Memoria ajustada (${mb} MB): prueba un launcher ligero y limita apps de inicio una por una."
+                else -> advice += "Memoria disponible: ${mb} MB. No se justifica limpiar RAM agresivamente; Android administra la memoria."
             }
         } else advice += "No se pudo leer MemAvailable; confirma /proc/meminfo antes de aplicar cambios."
 
@@ -28,9 +28,9 @@ object AiOptimizationAdvisor {
         if (pingTimes.isNotEmpty()) {
             val avg = pingTimes.average()
             when {
-                avg > 120 -> advice += "Latencia alta (promedio \${"%.0f".format(java.util.Locale.US, avg)} ms): acerca el TV al router y prueba 5 GHz si la señal es estable."
-                avg > 50 -> advice += "Latencia moderada (\${"%.0f".format(java.util.Locale.US, avg)} ms): compara bandas 2.4/5 GHz y congestión del canal."
-                else -> advice += "Latencia a Internet correcta (\${"%.0f".format(java.util.Locale.US, avg)} ms). Si el control va lento, revisa launcher o carga del sistema."
+                avg > 120 -> advice += "Latencia alta (promedio ${"%.0f".format(java.util.Locale.US, avg)} ms): acerca el TV al router y prueba 5 GHz si la señal es estable."
+                avg > 50 -> advice += "Latencia moderada (${"%.0f".format(java.util.Locale.US, avg)} ms): compara bandas 2.4/5 GHz y congestión del canal."
+                else -> advice += "Latencia a Internet correcta (${"%.0f".format(java.util.Locale.US, avg)} ms). Si el control va lento, revisa launcher o carga del sistema."
             }
         } else advice += "No hubo respuesta de ping o el comando no está disponible; esto no demuestra por sí solo que el Wi-Fi esté desconectado."
 

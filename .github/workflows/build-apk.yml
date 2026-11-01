@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/ai-tv-performance-optimizer]
     paths:
       - "android/app/**"
       - "android/build.gradle"

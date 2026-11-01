@@ -25,6 +25,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.net.InetSocketAddress
+import java.net.Socket
 
 class MainActivity : Activity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -321,11 +323,20 @@ class MainActivity : Activity() {
         val target = endpoint(connectPort.text.toString()) ?: return
         saveConnection()
         continueButton.visibility = View.GONE
-        status.text = "🟡 CONECTANDO · " + target.first + ":" + target.second
+        status.text = "🟡 PASO 1/2 · comprobando red hacia " + target.first + ":" + target.second
+        output.text = "Primero se comprueba el puerto TCP; después se negocia ADB y se verifica el modelo del dispositivo."
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    val candidate = Kadb.create(target.first, target.second, connectTimeout = 15000, socketTimeout = 15000)
+                    val probe = Socket()
+                    try {
+                        probe.connect(InetSocketAddress(target.first, target.second), 5000)
+                    } catch (networkError: Throwable) {
+                        throw IllegalStateException("No se puede abrir TCP hacia " + target.first + ":" + target.second + ". Comprueba IP, puerto, misma Wi-Fi y que ADB esté habilitado. Detalle: " + (networkError.message ?: networkError.javaClass.simpleName), networkError)
+                    } finally {
+                        runCatching { probe.close() }
+                    }
+                    val candidate = Kadb.create(target.first, target.second, connectTimeout = 12000, socketTimeout = 12000)
                     try {
                         val response = candidate.shell("getprop ro.product.model")
                         if (response.exitCode != 0) throw IllegalStateException(response.allOutput.ifBlank { "El dispositivo rechazó la consulta ADB." })
@@ -340,13 +351,13 @@ class MainActivity : Activity() {
                 client?.close()
                 client = connected.first
                 status.text = "🟢 CONECTADO Y VERIFICADO · " + connected.second
-                output.text = "Sesión ADB verificada con " + target.first + ":" + target.second
+                output.text = "Red TCP accesible y protocolo ADB verificado con getprop. Destino: " + target.first + ":" + target.second
                 continueButton.visibility = View.GONE
             }.onFailure { error ->
                 val detail = error.message ?: "sin respuesta"
                 val unauthorized = detail.contains("unauthorized", true) || detail.contains("auth", true)
                 status.text = if (unauthorized) "🟠 AUTORIZACIÓN ADB PENDIENTE" else "🔴 CONEXIÓN FALLIDA"
-                output.text = if (unauthorized) "El destino aún no autorizó esta identidad ADB. Acepta el diálogo en la TV y vuelve a pulsar CONTINUAR. Si no aparece, revisa que la depuración esté activada y que el puerto sea el de conexión, no el de pairing. Detalle: $detail" else "No se estableció una sesión ADB válida. Comprueba que el teléfono y la TV estén en la misma red, que el puerto sea correcto y que el destino tenga ADB activo. Para Android 11+ vincula primero con el puerto temporal y luego usa el puerto de conexión. Detalle: $detail"
+                output.text = if (unauthorized) "El destino aún no autorizó esta identidad ADB. Acepta el diálogo RSA en la TV y vuelve a pulsar REINTENTAR. Detalle: $detail" else "La conexión no completó el protocolo ADB. Si TCP respondió, el puerto está abierto pero puede no ser el puerto ADB correcto o puede requerir pairing TLS. Para Android 11+ vincula con el puerto temporal y conecta después al puerto principal. En ADB TCP clásico el destino debe tener adb tcpip 5555 activo. Detalle: $detail"
                 continueButton.visibility = View.VISIBLE
             }
         }

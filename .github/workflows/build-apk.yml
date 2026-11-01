@@ -9,6 +9,14 @@ on:
       - "android/settings.gradle"
       - "android/gradle.properties"
       - ".github/workflows/build-apk.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "android/app/**"
+      - "android/build.gradle"
+      - "android/settings.gradle"
+      - "android/gradle.properties"
+      - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 
 permissions:

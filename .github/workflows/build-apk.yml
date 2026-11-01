@@ -56,6 +56,11 @@ jobs:
           grep -q "com.flyfishxu:kadb-android:1.3.0" app/build.gradle
           grep -q "compileSdk 36" app/build.gradle
 
+      - name: Validate web panel JavaScript and package metadata
+        run: |
+          node --check server.js
+          node -e "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8'))"
+
       - name: Build and test APK
         working-directory: android
         run: gradle --no-daemon --stacktrace clean testDebugUnitTest assembleDebug

@@ -122,6 +122,8 @@ class MainActivity : Activity() {
         val diagnosticPanel = panel("DIAGNÓSTICO DEL EQUIPO", "Consultas de solo lectura para comprobar modelo, Android, memoria, almacenamiento y pantalla.")
         diagnosticPanel.addView(action("EJECUTAR DIAGNÓSTICO COMPLETO", true, ::diagnostics))
         diagnosticPanel.addView(action("VER APLICACIONES INSTALADAS", false, ::installedApps))
+        diagnosticPanel.addView(action("ANÁLISIS INTELIGENTE DE RENDIMIENTO + WI-FI", true, ::smartAnalysis))
+        diagnosticPanel.addView(action("MEDIR CONEXIÓN WI-FI", false, ::wifiDiagnostics))
         pageDiagnostics.addView(diagnosticPanel)
 
         pageTools = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -158,6 +160,10 @@ class MainActivity : Activity() {
     }
 
     private fun scanWifi() {
+        discoveryListeners.forEach { listener -> runCatching { nsdManager?.stopServiceDiscovery(listener) } }
+        discoveryListeners.clear()
+        runCatching { multicastLock?.let { if (it.isHeld) it.release() } }
+        multicastLock = null
         val manager = getSystemService(Context.NSD_SERVICE) as NsdManager
         nsdManager = manager
         discovered.clear()
@@ -429,6 +435,77 @@ class MainActivity : Activity() {
         }
     }
 
+
+    // Read-only performance and network snapshot. Recommendations are generated locally.
+    private fun smartAnalysis() {
+        val current = connectedClient() ?: return
+        status.text = "Analizando rendimiento, launcher, red y respuesta…"
+        val checks = listOf(
+            "MANUFACTURER" to "getprop ro.product.manufacturer",
+            "MODEL" to "getprop ro.product.model",
+            "ANDROID" to "getprop ro.build.version.release",
+            "SDK" to "getprop ro.build.version.sdk",
+            "DISPLAY" to "getprop ro.build.display.id",
+            "FINGERPRINT" to "getprop ro.build.fingerprint",
+            "HARDWARE" to "getprop ro.hardware",
+            "PRODUCT" to "getprop ro.product.device",
+            "CPU" to "dumpsys cpuinfo",
+            "MEMORIA" to "cat /proc/meminfo",
+            "ALMACENAMIENTO" to "df -h /data",
+            "TEMPERATURA" to "dumpsys thermalservice",
+            "WIFI" to "dumpsys wifi",
+            "RED" to "ip route; ip addr",
+            "LATENCIA INTERNET" to "ping -c 4 -W 2 1.1.1.1",
+            "LAUNCHER ACTUAL" to "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+            "ANIMACIONES" to "settings get global window_animation_scale; settings get global transition_animation_scale; settings get global animator_duration_scale",
+            "REFRESCO" to "settings get system peak_refresh_rate; settings get system min_refresh_rate",
+            "RESOLUCION" to "wm size; wm density"
+        )
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    buildString {
+                        checks.forEach { (name, command) ->
+                            val response = current.shell(command)
+                            append("=== ").append(name).append(" ===\n")
+                                .append(response.allOutput.ifBlank { "(sin salida)" }).append("\n\n")
+                        }
+                    }
+                }
+            }
+            result.onSuccess { report ->
+                val advice = AiOptimizationAdvisor.analyze(report)
+                status.text = "ANÁLISIS COMPLETADO · recomendaciones priorizadas"
+                output.text = report + "\n=== ASESOR INTELIGENTE LOCAL ===\n" +
+                    advice.joinToString("\n") { "• " + it } +
+                    "\n\nEste asesor es local y no modifica ajustes. La conexión con un modelo generativo externo requiere configurar un proveedor y una clave API propia."
+            }.onFailure { status.text = "Falló el análisis: " + (it.message ?: "error") }
+        }
+    }
+
+    private fun wifiDiagnostics() {
+        val current = connectedClient() ?: return
+        status.text = "Midiendo conectividad Wi-Fi…"
+        val commands = listOf(
+            "Estado Wi-Fi" to "dumpsys wifi", "Ruta y puerta de enlace" to "ip route",
+            "Direcciones de red" to "ip addr", "Latencia Internet" to "ping -c 5 -W 2 1.1.1.1"
+        )
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    buildString {
+                        commands.forEach { (label, command) ->
+                            append("=== ").append(label).append(" ===\n")
+                            append(current.shell(command).allOutput.ifBlank { "(sin salida)" }).append("\n\n")
+                        }
+                    }
+                }
+            }
+            result.onSuccess { status.text = "Diagnóstico Wi-Fi completado"; output.text = it }
+                .onFailure { status.text = "Error de red: " + (it.message ?: "error") }
+        }
+    }
+
     private fun installedApps() {
         val current = connectedClient() ?: return
         status.text = "Consultando aplicaciones instaladas…"
@@ -451,6 +528,11 @@ class MainActivity : Activity() {
             status.text = "Puerto ADB no válido"
             return
         }
+        if (prefs.getBoolean("profile_saved", false)) {
+            status.text = "Hay un perfil pendiente de restaurar"
+            output.text = "Restaura primero el perfil anterior. Así se conserva el estado original y no se guarda 0.5x como nuevo valor previo."
+            return
+        }
         status.text = "Guardando ajustes actuales y aplicando perfil…"
         scope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -460,6 +542,10 @@ class MainActivity : Activity() {
                         val response = current.shell("settings get global " + key)
                         if (response.exitCode != 0) throw IllegalStateException("No se pudo leer " + key + ": " + response.allOutput)
                         val value = response.allOutput.trim()
+                        if (value.isNotEmpty() && value != "null" &&
+                            !value.matches(Regex("(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)"))) {
+                            throw IllegalStateException("Valor previo no válido para " + key + "; no se aplicaron cambios.")
+                        }
                         previous[key] = if (value.isBlank() || value == "null") null else value
                     }
                     try {
@@ -483,7 +569,13 @@ class MainActivity : Activity() {
                         if (value != null) edit.putString("profile_value_" + key, value)
                         else edit.remove("profile_value_" + key)
                     }
-                    edit.apply()
+                    if (!edit.commit()) {
+                        previous.forEach { (key, value) ->
+                            val restore = if (value == null) "settings delete global " + key else "settings put global " + key + " " + value
+                            runCatching { current.shell(restore) }
+                        }
+                        throw IllegalStateException("No se pudo guardar el respaldo; se intentó restaurar el estado original.")
+                    }
                     "Perfil aplicado: animaciones a 0.5x.\nValores anteriores guardados para restauración."
                 }
             }
@@ -514,9 +606,13 @@ class MainActivity : Activity() {
                     animationKeys.forEach { key ->
                         val hasValue = prefs.getBoolean("profile_has_" + key, false)
                         val value = prefs.getString("profile_value_" + key, "") ?: ""
-                        val command = if (hasValue) "settings put global " + key + " " + value else "settings delete global " + key
-                        val response = current.shell(command)
-                        if (response.exitCode != 0) failures += key + ": " + response.allOutput
+                        if (hasValue && !value.matches(Regex("(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)"))) {
+                            failures += key + ": valor guardado inválido; no se ejecutó el comando"
+                        } else {
+                            val command = if (hasValue) "settings put global " + key + " " + value else "settings delete global " + key
+                            val response = current.shell(command)
+                            if (response.exitCode != 0) failures += key + ": " + response.allOutput
+                        }
                     }
                     if (failures.isNotEmpty()) throw IllegalStateException("Restauración parcial. Reintenta: " + failures.joinToString("; "))
                     prefs.edit().putBoolean("profile_saved", false).apply()

@@ -29,13 +29,21 @@ button:disabled{opacity:.5;cursor:wait}.actions{display:flex;flex-wrap:wrap;gap:
 <section class="panel"><p><strong>Seguridad:</strong> este panel solo escucha en localhost. No elimina apps, no cambia DNS, no ejecuta root ni modifica parámetros del kernel automáticamente.</p></section>
 </main>
 <script>
-const $=id=>document.getElementById(id), terminal=$('terminal');let previous=null;
+const $=id=>document.getElementById(id), terminal=$('terminal');
+let previous=null, previousTarget=null;
+try {
+  const saved=JSON.parse(localStorage.getItem('liamliz-tv-profile')||'null');
+  if(saved && saved.target===JSON.stringify(target())) {
+    previous=saved.previous;previousTarget=saved.target;
+    $('restore').disabled=false;
+  }
+} catch { localStorage.removeItem('liamliz-tv-profile'); }
 function log(message){terminal.value+=new Date().toLocaleTimeString()+'  '+message+'\n';terminal.scrollTop=terminal.scrollHeight}
 function target(){return {ip:$('ip').value.trim(),port:Number($('port').value)}}
 async function api(path,body={}){const response=await fetch('/api/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...target(),...body})});const data=await response.json();if(!response.ok)throw new Error(data.error||JSON.stringify(data));return data}
 $('connect').onclick=async()=>{try{const d=await api('connect');$('status').textContent=d.status==='connected'?'ADB conectado: '+d.raw.stdout:'ADB: '+d.status;log(d.message)}catch(e){log('ERROR: '+e.message);$('status').textContent='No conectado'}};
 $('diagnose').onclick=async()=>{try{log('Iniciando auditoría de solo lectura...');const d=await api('diagnose');log('Objetivo: '+d.target+' | RAM disponible aprox.: '+(d.availableRamMb??'no disponible')+' MB');for(const c of d.checks)log(c.name+' — '+(c.success?'OK':'ERROR')+'\n'+(c.stdout||c.stderr).slice(0,2200));}catch(e){log('ERROR: '+e.message)}};
-$('apply').onclick=async()=>{if(!confirm('¿Aplicar escalas de animación a 0.5x? Se guardarán los valores actuales para restaurarlos.'))return;try{const d=await api('apply-safe-profile');previous=d.previous;$('restore').disabled=false;log(d.message);log('Valores anteriores: '+JSON.stringify(previous))}catch(e){log('ERROR: '+e.message)}};
-$('restore').onclick=async()=>{if(!previous)return;try{const d=await api('restore-profile',{previous});log('Restauración: '+d.status);$('restore').disabled=true;previous=null}catch(e){log('ERROR: '+e.message)}};
+$('apply').onclick=async()=>{if(previous){log('Restaura primero el perfil pendiente antes de volver a aplicarlo.');return}if(!confirm('¿Aplicar escalas de animación a 0.5x? Se guardarán los valores actuales para restaurarlos.'))return;try{const d=await api('apply-safe-profile');previous=d.previous;previousTarget=JSON.stringify(target());localStorage.setItem('liamliz-tv-profile',JSON.stringify({target:previousTarget,previous}));$('restore').disabled=false;log(d.message);log('Valores anteriores: '+JSON.stringify(previous))}catch(e){log('ERROR: '+e.message)}};
+$('restore').onclick=async()=>{if(!previous)return;if(JSON.stringify(target())!==previousTarget){log('ERROR: reconecta con la misma IP y puerto donde aplicaste el perfil.');return}try{const d=await api('restore-profile',{previous});log('Restauración: '+d.status);$('restore').disabled=true;previous=null;previousTarget=null;localStorage.removeItem('liamliz-tv-profile')}catch(e){log('ERROR: '+e.message)}};
 document.querySelectorAll('[data-key]').forEach(button=>button.onclick=async()=>{try{await api('remote-key',{keycode:Number(button.dataset.key)})}catch(e){log('Tecla fallida: '+e.message)}});
 </script></body></html>

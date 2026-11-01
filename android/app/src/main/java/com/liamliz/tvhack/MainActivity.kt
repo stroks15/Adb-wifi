@@ -453,8 +453,8 @@ class MainActivity : Activity() {
                     buildString {
                         checks.forEach { (name, command) ->
                             val response = current.shell(command)
-                            append("=== ").append(name).append(" ===\\n")
-                                .append(response.allOutput.ifBlank { "(sin salida)" }).append("\\n\\n")
+                            append("=== ").append(name).append(" ===\n")
+                                .append(response.allOutput.ifBlank { "(sin salida)" }).append("\n\n")
                         }
                     }
                 }
@@ -462,9 +462,9 @@ class MainActivity : Activity() {
             result.onSuccess { report ->
                 val advice = AiOptimizationAdvisor.analyze(report)
                 status.text = "ANÁLISIS COMPLETADO · recomendaciones priorizadas"
-                output.text = report + "\\n=== ASESOR INTELIGENTE LOCAL ===\\n" +
-                    advice.joinToString("\\n") { "• " + it } +
-                    "\\n\\nEste asesor es local y no modifica ajustes. La conexión con un modelo generativo externo requiere configurar un proveedor y una clave API propia."
+                output.text = report + "\n=== ASESOR INTELIGENTE LOCAL ===\n" +
+                    advice.joinToString("\n") { "• " + it } +
+                    "\n\nEste asesor es local y no modifica ajustes. La conexión con un modelo generativo externo requiere configurar un proveedor y una clave API propia."
             }.onFailure { status.text = "Falló el análisis: " + (it.message ?: "error") }
         }
     }
@@ -481,8 +481,8 @@ class MainActivity : Activity() {
                 runCatching {
                     buildString {
                         commands.forEach { (label, command) ->
-                            append("=== ").append(label).append(" ===\\n")
-                            append(current.shell(command).allOutput.ifBlank { "(sin salida)" }).append("\\n\\n")
+                            append("=== ").append(label).append(" ===\n")
+                            append(current.shell(command).allOutput.ifBlank { "(sin salida)" }).append("\n\n")
                         }
                     }
                 }

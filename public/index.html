@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1220">
+<title>Liamliz TV Hack</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#0b1220;color:#e5edf7}
+*{box-sizing:border-box}body{margin:0;padding:20px;background:radial-gradient(circle at top,#14243a,#080d16 65%);min-height:100vh}
+main{max-width:900px;margin:auto}.panel{background:#121e2e;border:1px solid #263a50;border-radius:18px;padding:20px;margin:14px 0;box-shadow:0 12px 32px #0005}
+h1{margin:0;color:#67e8f9;font-size:clamp(25px,5vw,36px)}h2{font-size:18px;margin-top:0;color:#c8d9e9}
+p,.muted{color:#9eb1c6;line-height:1.5}.fields{display:flex;gap:10px;flex-wrap:wrap}
+input{flex:1;min-width:170px;background:#08111d;border:1px solid #38536d;color:white;border-radius:10px;padding:13px;font-size:16px}
+button{border:0;border-radius:10px;padding:12px 16px;background:#67e8f9;color:#06202b;font-weight:750;cursor:pointer;margin:4px}
+button.secondary{background:#263b50;color:#e5edf7}button.warn{background:#f59e0b;color:#241600}
+button:disabled{opacity:.5;cursor:wait}.actions{display:flex;flex-wrap:wrap;gap:6px}
+#terminal{width:100%;height:270px;background:#03070c;color:#a7f3d0;border:1px solid #263a50;border-radius:10px;padding:13px;resize:vertical;font:12px/1.5 ui-monospace,monospace}
+.dpad{display:grid;grid-template-columns:repeat(3,64px);gap:8px;justify-content:center;margin:15px}
+.dpad button{height:54px;padding:0;font-size:20px}.status{font-weight:700;color:#fbbf24}
+@media(max-width:520px){body{padding:10px}.panel{padding:15px}.fields>*{width:100%}}
+</style>
+</head>
+<body><main>
+<section class="panel"><h1>LIAMLIZ TV HACK</h1><p>Diagnóstico y control local de Android TV mediante ADB Wi-Fi.</p>
+<div class="fields"><input id="ip" value="192.168.0.125" aria-label="IP de Android TV" placeholder="192.168.0.125"><input id="port" value="5555" type="number" min="1" max="65535" aria-label="Puerto ADB" style="max-width:120px"><button id="connect">Conectar ADB</button></div><p id="status" class="status">Sin conexión verificada</p></section>
+<section class="panel"><h2>Auditoría del dispositivo</h2><div class="actions"><button id="diagnose">Ejecutar diagnóstico</button><button id="apply" class="warn">Aplicar perfil reversible 0.5x</button><button id="restore" class="secondary" disabled>Restaurar valores anteriores</button></div><p class="muted">El diagnóstico es de solo lectura. El perfil modifica únicamente las tres escalas de animación y conserva los valores previos para restaurarlos.</p></section>
+<section class="panel"><h2>Control remoto D-Pad</h2><div class="dpad"><span></span><button data-key="19">▲</button><span></span><button data-key="21">◀</button><button data-key="23">OK</button><button data-key="22">▶</button><span></span><button data-key="20">▼</button><span></span></div><div class="actions" style="justify-content:center"><button class="secondary" data-key="4">Atrás</button><button class="secondary" data-key="3">Inicio</button></div></section>
+<section class="panel"><h2>Consola de actividad</h2><textarea id="terminal" readonly aria-label="Registro de actividad" placeholder="Esperando operaciones..."></textarea></section>
+<section class="panel"><p><strong>Seguridad:</strong> este panel solo escucha en localhost. No elimina apps, no cambia DNS, no ejecuta root ni modifica parámetros del kernel automáticamente.</p></section>
+</main>
+<script>
+const $=id=>document.getElementById(id), terminal=$('terminal');let previous=null;
+function log(message){terminal.value+=new Date().toLocaleTimeString()+'  '+message+'\n';terminal.scrollTop=terminal.scrollHeight}
+function target(){return {ip:$('ip').value.trim(),port:Number($('port').value)}}
+async function api(path,body={}){const response=await fetch('/api/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...target(),...body})});const data=await response.json();if(!response.ok)throw new Error(data.error||JSON.stringify(data));return data}
+$('connect').onclick=async()=>{try{const d=await api('connect');$('status').textContent=d.status==='connected'?'ADB conectado: '+d.raw.stdout:'ADB: '+d.status;log(d.message)}catch(e){log('ERROR: '+e.message);$('status').textContent='No conectado'}};
+$('diagnose').onclick=async()=>{try{log('Iniciando auditoría de solo lectura...');const d=await api('diagnose');log('Objetivo: '+d.target+' | RAM disponible aprox.: '+(d.availableRamMb??'no disponible')+' MB');for(const c of d.checks)log(c.name+' — '+(c.success?'OK':'ERROR')+'\n'+(c.stdout||c.stderr).slice(0,2200));}catch(e){log('ERROR: '+e.message)}};
+$('apply').onclick=async()=>{if(!confirm('¿Aplicar escalas de animación a 0.5x? Se guardarán los valores actuales para restaurarlos.'))return;try{const d=await api('apply-safe-profile');previous=d.previous;$('restore').disabled=false;log(d.message);log('Valores anteriores: '+JSON.stringify(previous))}catch(e){log('ERROR: '+e.message)}};
+$('restore').onclick=async()=>{if(!previous)return;try{const d=await api('restore-profile',{previous});log('Restauración: '+d.status);$('restore').disabled=true;previous=null}catch(e){log('ERROR: '+e.message)}};
+document.querySelectorAll('[data-key]').forEach(button=>button.onclick=async()=>{try{await api('remote-key',{keycode:Number(button.dataset.key)})}catch(e){log('Tecla fallida: '+e.message)}});
+</script></body></html>

@@ -268,6 +268,12 @@ class MainActivity : Activity() {
     private fun applySafeProfile() {
         val current = connectedClient() ?: return
         val prefs = getSharedPreferences("liamliz_connection", MODE_PRIVATE)
+        val profileHost = host.text.toString().trim()
+        val profilePort = connectPort.text.toString().trim().toIntOrNull()
+        if (profilePort == null) {
+            status.text = "Puerto ADB no válido"
+            return
+        }
         status.text = "Guardando ajustes actuales y aplicando perfil…"
         scope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -292,8 +298,8 @@ class MainActivity : Activity() {
                         throw error
                     }
                     val edit = prefs.edit()
-                        .putString("profile_host", host.text.toString().trim())
-                        .putInt("profile_port", connectPort.text.toString().trim().toInt())
+                        .putString("profile_host", profileHost)
+                        .putInt("profile_port", profilePort)
                         .putBoolean("profile_saved", true)
                     previous.forEach { (key, value) ->
                         edit.putBoolean("profile_has_" + key, value != null)

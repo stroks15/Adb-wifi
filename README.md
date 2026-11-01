@@ -8,7 +8,7 @@ La app Android está en android/ y no depende del panel web, Node.js ni Termux. 
 
 ## Compilación
 
-GitHub Actions genera una APK debug firmada en cada cambio de android/** o del workflow. Descarga el artefacto Liamliz-TV-Hack-debug desde la ejecución exitosa en Actions.
+GitHub Actions genera una APK debug firmada al cambiar el código/configuración Android, el panel web o el workflow. Descarga el artefacto Liamliz-TV-Hack-debug desde la ejecución exitosa en Actions.
 
 La compilación de la rama de desarrollo usa JDK 17, Gradle 9.3.1, Android Gradle Plugin 9.1.1, Kotlin 2.4.21 y Kadb Android 1.3.0. AndroidX está habilitado explícitamente.
 

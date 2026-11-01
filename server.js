@@ -108,7 +108,11 @@ app.post('/api/apply-safe-profile', async (req, res) => {
   for (const key of keys) {
     const read = await deviceCommand(target, ['settings', 'get', 'global', key]);
     if (!read.success) return res.status(502).json({ error: `No se pudo leer ${key}; no se aplicaron cambios.`, details: read });
-    previous[key] = read.stdout.trim() === 'null' ? '1' : read.stdout.trim();
+    const value = read.stdout.trim();
+    if (value !== 'null' && !/^(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(value)) {
+      return res.status(502).json({ error: `Valor inesperado en ${key}; no se aplicaron cambios.`, details: read });
+    }
+    previous[key] = value === 'null' ? null : value;
   }
 
   const applied = [];
@@ -117,9 +121,12 @@ app.post('/api/apply-safe-profile', async (req, res) => {
     applied.push({ key, ...result });
     if (!result.success) {
       for (const restoreKey of keys) {
-        if (Object.hasOwn(previous, restoreKey)) {
-          await deviceCommand(target, ['settings', 'put', 'global', restoreKey, previous[restoreKey]]);
-        }
+        if (!Object.hasOwn(previous, restoreKey)) continue;
+        const oldValue = previous[restoreKey];
+        const restoreArgs = oldValue === null
+          ? ['settings', 'delete', 'global', restoreKey]
+          : ['settings', 'put', 'global', restoreKey, oldValue];
+        await deviceCommand(target, restoreArgs);
       }
       return res.status(502).json({ error: `Falló ${key}; se intentó restaurar el estado anterior.`, previous, applied });
     }
@@ -132,11 +139,18 @@ app.post('/api/restore-profile', async (req, res) => {
   try { target = parseTarget(req.body); } catch (error) { return res.status(400).json({ error: error.message }); }
   const previous = req.body?.previous;
   const keys = ['window_animation_scale', 'transition_animation_scale', 'animator_duration_scale'];
-  if (!previous || !keys.every(key => typeof previous[key] === 'string' && /^[0-9.]+$/.test(previous[key]))) {
+  const validValue = (value) => value === null ||
+    (typeof value === 'string' && /^(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(value));
+  if (!previous || !keys.every(key => Object.hasOwn(previous, key) && validValue(previous[key]))) {
     return res.status(400).json({ error: 'No se recibieron los valores anteriores válidos.' });
   }
   const results = [];
-  for (const key of keys) results.push({ key, ...(await deviceCommand(target, ['settings', 'put', 'global', key, previous[key]])) });
+  for (const key of keys) {
+    const args = previous[key] === null
+      ? ['settings', 'delete', 'global', key]
+      : ['settings', 'put', 'global', key, previous[key]];
+    results.push({ key, ...(await deviceCommand(target, args)) });
+  }
   const failed = results.some(item => !item.success);
   res.status(failed ? 502 : 200).json({ status: failed ? 'partial' : 'restored', results });
 });

@@ -23,6 +23,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.InetSocketAddress
+import java.net.Socket
 
 class MainActivity : Activity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -43,89 +45,116 @@ class MainActivity : Activity() {
     private lateinit var discoveredView: TextView
     private lateinit var discoveredList: LinearLayout
     private var selectedEndpoint: Pair<String, Int>? = null
+    private lateinit var pageConnection: LinearLayout
+    private lateinit var pageDiagnostics: LinearLayout
+    private lateinit var pageTools: LinearLayout
+    private val stepButtons = mutableListOf<Button>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val prefs = getSharedPreferences("liamliz_connection", MODE_PRIVATE)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(22, 22, 22, 28)
-            setBackgroundColor(0xFF020B06.toInt())
+            setPadding(18, 18, 18, 24)
+            setBackgroundColor(0xFF06110C.toInt())
         }
-        fun heading(value: String, size: Float = 16f) = TextView(this).apply {
-            text = value
-            textSize = size
-            setTextColor(0xFF8BFF9B.toInt())
-            setPadding(0, 15, 0, 7)
+        fun heading(value: String, size: Float = 15f, color: Int = 0xFFA6B8AA.toInt()) = TextView(this).apply {
+            text = value; textSize = size; setTextColor(color); setPadding(0, 8, 0, 8)
         }
         fun field(hintText: String, value: String, numeric: Boolean = false) = EditText(this).apply {
-            hint = hintText
-            setText(value)
-            textSize = 16f
-            setSingleLine(true)
-            setTextColor(0xFFFFFFFF.toInt())
-            setHintTextColor(0xFF94A3B8.toInt())
+            hint = hintText; setText(value); textSize = 16f; setSingleLine(true)
+            setTextColor(0xFFFFFFFF.toInt()); setHintTextColor(0xFF789080.toInt())
             inputType = if (numeric) InputType.TYPE_CLASS_NUMBER else InputType.TYPE_CLASS_TEXT
-            setPadding(14, 10, 14, 10)
-            setBackgroundColor(0xFF092014.toInt())
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 7 }
+            setPadding(14, 12, 14, 12); setBackgroundColor(0xFF10251A.toInt())
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 8 }
         }
-        fun action(label: String, callback: () -> Unit) = Button(this).apply {
-            text = label
-            isAllCaps = false
-            textSize = 14f
-            setOnClickListener { callback() }
-            backgroundTintList = android.content.res.ColorStateList.valueOf(0xFF35E86B.toInt())
-            setTextColor(0xFF031409.toInt())
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = 5; bottomMargin = 3 }
+        fun action(label: String, primary: Boolean = false, callback: () -> Unit) = Button(this).apply {
+            text = label; isAllCaps = false; textSize = 14f; setOnClickListener { callback() }
+            backgroundTintList = android.content.res.ColorStateList.valueOf(if (primary) 0xFF56F58A.toInt() else 0xFF183425.toInt())
+            setTextColor(if (primary) 0xFF031409.toInt() else 0xFFE6F5EA.toInt())
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = 5; bottomMargin = 5 }
+        }
+        fun panel(title: String, detail: String) = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(14, 12, 14, 14); setBackgroundColor(0xFF0C1D14.toInt())
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12 }
+            addView(heading(title, 18f, 0xFF56F58A.toInt())); addView(heading(detail, 13f))
         }
 
-        root.addView(heading("◈ LIAMLIZ TV HACK", 29f))
-        root.addView(heading("ADB CONTROL CENTER  •  GREEN NEON EDITION", 12f))
-        root.addView(heading("Control ADB Wi-Fi para Android y Android TV. No necesita Termux, navegador ni app auxiliar."))
-        root.addView(heading("Dispositivo destino"))
-        host = field("IP o nombre del dispositivo", prefs.getString("host", "") ?: "")
-        connectPort = field("Puerto ADB de conexión (ej. 5555 o puerto TLS)", prefs.getString("connect_port", "5555") ?: "5555", true)
-        root.addView(host)
-        root.addView(connectPort)
-        root.addView(action("CONECTAR / REINTENTAR", ::connectDevice))
-        root.addView(action("⌁ ANALIZAR WI-FI · BUSCAR DISPOSITIVOS ADB", ::scanWifi))
-        discoveredView = heading("Escáner: sin búsqueda activa", 13f)
-        root.addView(discoveredView)
+        root.addView(heading("LIAMLIZ  /  TV HACK", 26f, 0xFF56F58A.toInt()))
+        root.addView(heading("ADB CONTROL CENTER  •  GREEN NEON", 11f))
+        root.addView(heading("Flujo guiado en tres pasos. Primero conecta, después diagnostica y finalmente usa las herramientas.", 13f))
+        val navigation = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        listOf("1 · CONECTAR", "2 · DIAGNÓSTICO", "3 · HERRAMIENTAS").forEachIndexed { index, label ->
+            val button = Button(this).apply {
+                text = label; isAllCaps = false; textSize = 10f
+                layoutParams = LinearLayout.LayoutParams(0, 52, 1f).apply { setMargins(2, 5, 2, 10) }
+                setOnClickListener { showStep(index) }
+            }
+            stepButtons.add(button); navigation.addView(button)
+        }
+        root.addView(navigation)
+
+        pageConnection = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val manual = panel("01  CONEXIÓN MANUAL", "Para ADB TCP clásico introduce la IP y el puerto 5555. Para depuración inalámbrica Android 11+ usa el puerto TLS que aparece en el destino.")
+        host = field("IP del dispositivo (ej. 192.168.0.125)", prefs.getString("host", "192.168.0.125") ?: "192.168.0.125")
+        connectPort = field("Puerto ADB de conexión (ej. 5555)", prefs.getString("connect_port", "5555") ?: "5555", true)
+        manual.addView(host); manual.addView(connectPort)
+        manual.addView(action("CONECTAR A ESTA IP", true, ::connectDevice))
+        pageConnection.addView(manual)
+
+        val scanner = panel("02  BUSCAR EQUIPOS EN WI-FI", "Los dispositivos detectados aparecen como tarjetas seleccionables. La app nunca escogerá automáticamente el primer resultado.")
+        scanner.addView(action("⌁  ESCANEAR SERVICIOS ADB", true, ::scanWifi))
+        discoveredView = heading("Escáner inactivo. Inicia una búsqueda.", 13f, 0xFF56F58A.toInt())
+        scanner.addView(discoveredView)
         discoveredList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        root.addView(discoveredList)
-        root.addView(action("CONECTAR EQUIPO SELECCIONADO", ::connectDiscovered))
+        scanner.addView(discoveredList)
+        scanner.addView(action("CONECTAR EQUIPO SELECCIONADO", true, ::connectDiscovered))
+        pageConnection.addView(scanner)
 
-        root.addView(heading("VINCULACIÓN INALÁMBRICA · ANDROID 11+"))
-        root.addView(heading("Abre Depuración inalámbrica en el destino. Usa el puerto temporal y el código de esa pantalla."))
+        val pairing = panel("03  VINCULACIÓN SEGURA · ANDROID 11+", "En el dispositivo abre Depuración inalámbrica → Vincular dispositivo con código. El puerto temporal y el puerto de conexión son distintos.")
         pairPort = field("Puerto temporal de vinculación", prefs.getString("pair_port", "") ?: "", true)
         pairCode = field("Código de vinculación de 6 dígitos", "")
-        root.addView(pairPort)
-        root.addView(pairCode)
-        root.addView(action("VINCULAR DISPOSITIVO", ::pairDevice))
+        pairing.addView(pairPort); pairing.addView(pairCode)
+        pairing.addView(action("VINCULAR DISPOSITIVO", false, ::pairDevice))
+        pageConnection.addView(pairing)
 
-        status = heading("Estado: sin conexión verificada", 17f)
-        root.addView(status)
-        output = heading("Introduce la IP y el puerto de conexión del destino. La vinculación usa un puerto distinto.", 13f)
-        root.addView(output)
-        continueButton = action("CONTINUAR · YA AUTORICÉ ADB", ::connectDevice).apply { visibility = View.GONE }
-        root.addView(continueButton)
+        pageDiagnostics = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val diagnosticPanel = panel("DIAGNÓSTICO DEL EQUIPO", "Consultas de solo lectura para comprobar modelo, Android, memoria, almacenamiento y pantalla.")
+        diagnosticPanel.addView(action("EJECUTAR DIAGNÓSTICO COMPLETO", true, ::diagnostics))
+        diagnosticPanel.addView(action("VER APLICACIONES INSTALADAS", false, ::installedApps))
+        pageDiagnostics.addView(diagnosticPanel)
 
-        root.addView(heading("DIAGNÓSTICO DEL DISPOSITIVO"))
-        root.addView(action("Ejecutar diagnóstico completo", ::diagnostics))
-        root.addView(action("Ver aplicaciones de terceros", ::installedApps))
+        pageTools = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val optimizer = panel("OPTIMIZACIÓN SEGURA", "Perfil reversible: cambia únicamente las escalas de animación a 0.5x y guarda los valores anteriores.")
+        optimizer.addView(action("APLICAR PERFIL 0.5X", true, ::applySafeProfile))
+        optimizer.addView(action("RESTAURAR VALORES ANTERIORES", false, ::restoreSafeProfile))
+        pageTools.addView(optimizer)
+        val remote = panel("CONTROL REMOTO", "Envía navegación, OK, atrás e inicio al equipo conectado.")
+        addDpad(remote, ::sendKey)
+        remote.addView(action("DESCONECTAR", false, ::disconnect))
+        pageTools.addView(remote)
 
-        root.addView(heading("OPTIMIZACIÓN SEGURA Y REVERSIBLE"))
-        root.addView(heading("Cambia solo las tres escalas de animación a 0.5x. Guarda los valores previos para restaurarlos."))
-        root.addView(action("Aplicar perfil 0.5x", ::applySafeProfile))
-        root.addView(action("Restaurar valores anteriores", ::restoreSafeProfile))
+        status = heading("🟡 PREPARANDO IDENTIDAD ADB…", 16f, 0xFF56F58A.toInt())
+        output = heading("Todavía no existe una sesión verificada.", 13f)
+        continueButton = action("REINTENTAR DESPUÉS DE AUTORIZAR", true, ::connectDevice).apply { visibility = View.GONE }
+        val footer = panel("ESTADO DE CONEXIÓN", "La aplicación confirma la sesión ejecutando una consulta real al dispositivo.")
+        footer.addView(status); footer.addView(output); footer.addView(continueButton)
 
-        root.addView(heading("CONTROL REMOTO"))
-        addDpad(root, ::sendKey)
-        root.addView(action("DESCONECTAR", ::disconnect))
-        root.addView(heading("Seguridad: no ejecuta root, no desinstala ni deshabilita aplicaciones y no cambia actualizaciones, DNS o kernel. La única modificación incluida es el perfil reversible de animaciones.", 12f))
-        setContentView(ScrollView(this).apply { addView(root) })
+        root.addView(pageConnection); root.addView(pageDiagnostics); root.addView(pageTools); root.addView(footer)
+        setContentView(ScrollView(this).apply { isFillViewport = true; addView(root) })
+        showStep(0)
         initializeAdbIdentity()
+    }
+
+    private fun showStep(step: Int) {
+        pageConnection.visibility = if (step == 0) View.VISIBLE else View.GONE
+        pageDiagnostics.visibility = if (step == 1) View.VISIBLE else View.GONE
+        pageTools.visibility = if (step == 2) View.VISIBLE else View.GONE
+        stepButtons.forEachIndexed { index, button ->
+            val active = index == step
+            button.backgroundTintList = android.content.res.ColorStateList.valueOf(if (active) 0xFF56F58A.toInt() else 0xFF183425.toInt())
+            button.setTextColor(if (active) 0xFF031409.toInt() else 0xFFE6F5EA.toInt())
+        }
     }
 
     private fun scanWifi() {

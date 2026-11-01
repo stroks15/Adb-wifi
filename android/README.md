@@ -33,3 +33,8 @@ Ambos equipos deben poder comunicarse en la misma red. La APK no puede aceptar p
 ## Compilación
 
 GitHub Actions ejecuta clean testDebugUnitTest assembleDebug con JDK 17, Gradle 8.13, Android Gradle Plugin 8.13.2 y Kotlin 2.4.21. El artefacto Liamliz-TV-Hack-debug contiene una APK debug firmada automáticamente para pruebas e instalación manual.
+
+
+## Dependencias y licencia
+
+Kadb Android se publica bajo Apache-2.0. Su implementación de pairing incluye la dependencia transitiva com.github.Flyfish233:spake2-java:1.1.1, publicada en JitPack y marcada GPL-3.0. Antes de distribuir esta APK como producto cerrado o integrarla en un proyecto con licencia incompatible, revisa las obligaciones de esa dependencia o sustituye la implementación de pairing por una alternativa con licencia compatible. El repositorio de este proyecto no recibe una licencia nueva automáticamente.

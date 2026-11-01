@@ -5,7 +5,9 @@ La APK es una aplicación Android nativa. No requiere Termux, un servidor Node, 
 ## Funciones incluidas
 
 - Conexión ADB directa mediante IP/host y puerto configurables.
-- Descubrimiento automático mDNS de servicios ADB `_adb._tcp` y `_adb-tls-connect._tcp` en la Wi-Fi local; los resultados se pueden seleccionar para conectar. No se confunden los puertos de pairing con los puertos de conexión.
+- Interfaz guiada en tres pasos: conexión, diagnóstico y herramientas; las funciones ya no se amontonan en una sola pantalla.
+- Descubrimiento automático mDNS de servicios ADB `_adb._tcp` y `_adb-tls-connect._tcp` en la Wi-Fi local; cada resultado aparece como una opción seleccionable y nunca se conecta al primer resultado automáticamente.
+- Comprobación previa de conectividad TCP con timeout y errores separados para puerto inaccesible frente a fallo del protocolo/autorización ADB.
 - Estados explícitos: conectando, conectado y verificado, autorización pendiente o conexión fallida.
 - Vinculación de Depuración inalámbrica mediante puerto temporal y código de seis dígitos (Android 11+ en teléfonos; Android TV requiere Android 13+).
 - Botón para reintentar después de aceptar la autorización RSA en el dispositivo destino.
@@ -48,4 +50,4 @@ GitHub Actions ejecuta clean testDebugUnitTest assembleDebug con JDK 17, Gradle 
 Kadb Android se publica bajo Apache-2.0. Su implementación de pairing incluye la dependencia transitiva com.github.Flyfish233:spake2-java:1.0.5, publicada en JitPack y marcada GPL-3.0. Antes de distribuir esta APK como producto cerrado o integrarla en un proyecto con licencia incompatible, revisa las obligaciones de esa dependencia o sustituye la implementación de pairing por una alternativa con licencia compatible. El repositorio de este proyecto no recibe una licencia nueva automáticamente.
 
 
-La compilación 1.4.0 usa Kadb Android 1.3.0 porque las versiones 2.1.x declaran compileSdk mínimo 37 y el paquete Android 37 no estuvo disponible en el repositorio SDK del runner de CI durante esta compilación. Se mantienen compileSdk 36 y se fija BouncyCastle 1.86; HiddenApiBypass permanece en la versión transitiva 6.1 que incluye Kadb 1.3.0, porque 6.2 declara compileSdk 37.
+La compilación 1.5.0 mantiene Kadb Android 1.3.0 porque las versiones 2.1.x declaran compileSdk mínimo 37 y el paquete Android 37 no estuvo disponible en el repositorio SDK del runner de CI durante esta compilación. Se mantienen compileSdk 36 y se fija BouncyCastle 1.86; HiddenApiBypass permanece en la versión transitiva 6.1 que incluye Kadb 1.3.0, porque 6.2 declara compileSdk 37.

@@ -8,6 +8,9 @@ on:
       - "android/build.gradle"
       - "android/settings.gradle"
       - "android/gradle.properties"
+      - "server.js"
+      - "public/**"
+      - "package.json"
       - ".github/workflows/build-apk.yml"
   pull_request:
     branches: [main]
@@ -60,6 +63,7 @@ jobs:
         run: |
           node --check server.js
           node -e "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8'))"
+          node -e "const vm=require('node:vm');const html=require('node:fs').readFileSync('public/index.html','utf8');const script=html.match(/<script>([\\s\\S]*?)<\\/script>/)?.[1];if(!script)process.exit(1);new vm.Script(script)"
 
       - name: Build and test APK
         working-directory: android

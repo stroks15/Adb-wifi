@@ -30,13 +30,12 @@ jobs:
         with:
           gradle-version: "9.3.1"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install Android 17 SDK
         run: |
-          yes | sdkmanager --licenses
-          sdkmanager "platforms;android-37" "build-tools;37.0.0"
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" "platforms;android-37" "build-tools;37.0.0"
 
       - name: Verify Android build configuration
         working-directory: android

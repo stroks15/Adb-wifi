@@ -109,7 +109,7 @@ app.post('/api/apply-safe-profile', async (req, res) => {
     const read = await deviceCommand(target, ['settings', 'get', 'global', key]);
     if (!read.success) return res.status(502).json({ error: `No se pudo leer ${key}; no se aplicaron cambios.`, details: read });
     const value = read.stdout.trim();
-    if (value !== 'null' && !/^(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(value)) {
+    if (value !== 'null' && !/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(value)) {
       return res.status(502).json({ error: `Valor inesperado en ${key}; no se aplicaron cambios.`, details: read });
     }
     previous[key] = value === 'null' ? null : value;
@@ -140,7 +140,7 @@ app.post('/api/restore-profile', async (req, res) => {
   const previous = req.body?.previous;
   const keys = ['window_animation_scale', 'transition_animation_scale', 'animator_duration_scale'];
   const validValue = (value) => value === null ||
-    (typeof value === 'string' && /^(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(value));
+    (typeof value === 'string' && /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(value));
   if (!previous || !keys.every(key => Object.hasOwn(previous, key) && validValue(previous[key]))) {
     return res.status(400).json({ error: 'No se recibieron los valores anteriores válidos.' });
   }

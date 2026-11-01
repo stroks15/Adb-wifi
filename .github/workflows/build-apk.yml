@@ -42,7 +42,7 @@ jobs:
         run: |
           test -f gradle.properties
           grep -q '^android.useAndroidX=true$' gradle.properties
-          grep -q "com.flyfishxu:kadb-android:2.1.4" app/build.gradle
+          grep -q "com.flyfishxu:kadb-android:1.3.0" app/build.gradle
           grep -q "compileSdk 36" app/build.gradle
 
       - name: Build and test APK

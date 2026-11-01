@@ -3,6 +3,7 @@ package com.liamliz.tvhack
 import android.app.Activity
 import android.os.Bundle
 import android.text.InputType
+import android.util.Base64
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -12,15 +13,12 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.flyfishxu.kadb.Kadb
 import com.flyfishxu.kadb.cert.KadbCert
-import com.flyfishxu.kadb.cert.OkioFilePrivateKeyStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okio.Path.Companion.toPath
-import java.io.File
 
 class MainActivity : Activity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -33,11 +31,10 @@ class MainActivity : Activity() {
     private lateinit var output: TextView
     private lateinit var continueButton: Button
     private var client: Kadb? = null
+    private var identityReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        KadbCert.configure(store = OkioFilePrivateKeyStore(File(filesDir, "adb-host-key.pem").absolutePath.toPath()))
-
         val prefs = getSharedPreferences("liamliz_connection", MODE_PRIVATE)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -108,6 +105,40 @@ class MainActivity : Activity() {
         root.addView(action("DESCONECTAR", ::disconnect))
         root.addView(heading("Seguridad: no ejecuta root, no desinstala ni deshabilita aplicaciones y no cambia actualizaciones, DNS o kernel. La única modificación incluida es el perfil reversible de animaciones.", 12f))
         setContentView(ScrollView(this).apply { addView(root) })
+        initializeAdbIdentity()
+    }
+
+    private fun initializeAdbIdentity() {
+        status.text = "Preparando identidad ADB segura…"
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val identityPrefs = getSharedPreferences("adb_identity", MODE_PRIVATE)
+                    val cert = identityPrefs.getString("certificate", null)
+                    val key = identityPrefs.getString("private_key", null)
+                    if (cert != null && key != null) {
+                        KadbCert.set(
+                            Base64.decode(cert, Base64.DEFAULT),
+                            Base64.decode(key, Base64.DEFAULT)
+                        )
+                    } else {
+                        val pair = KadbCert.get()
+                        check(identityPrefs.edit()
+                            .putString("certificate", Base64.encodeToString(pair.first, Base64.NO_WRAP))
+                            .putString("private_key", Base64.encodeToString(pair.second, Base64.NO_WRAP))
+                            .commit()) { "No se pudo guardar la identidad ADB." }
+                    }
+                }
+            }
+            result.onSuccess {
+                identityReady = true
+                status.text = "Identidad ADB persistente lista · sin conexión"
+                output.text = "La huella del controlador se conservará entre aperturas de la app."
+            }.onFailure { error ->
+                status.text = "No se pudo preparar la identidad ADB"
+                output.text = error.message ?: "Error al crear o cargar las claves ADB. Borra los datos de la app para regenerarlas."
+            }
+        }
     }
 
     private fun addDpad(root: LinearLayout, send: (Int) -> Unit) {
@@ -156,6 +187,10 @@ class MainActivity : Activity() {
     }
 
     private fun connectDevice() {
+        if (!identityReady) {
+            status.text = "Espera a que termine la inicialización de identidad ADB"
+            return
+        }
         val target = endpoint(connectPort.text.toString()) ?: return
         saveConnection()
         continueButton.visibility = View.GONE
@@ -189,6 +224,10 @@ class MainActivity : Activity() {
     }
 
     private fun pairDevice() {
+        if (!identityReady) {
+            status.text = "Espera a que termine la inicialización de identidad ADB"
+            return
+        }
         val target = endpoint(pairPort.text.toString()) ?: return
         val code = pairCode.text.toString().trim()
         if (!code.matches(Regex("[0-9]{6}"))) {
